@@ -15,15 +15,22 @@ on:
         description: "Whether to checkout submodules (true, false, or recursive)"
         default: "recursive"
         type: string
-
+      mm-branch:
+        description: "The MetaMod Repository branch to compile the extension against"
+        default: "1.12-dev"
+        type: string
 
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os:
           - ubuntu-24.04
           - windows-2022
+        sm-branch:
+          - master
+          - 1.12-dev
         include:
           - os: ubuntu-24.04
             cc: clang-14
@@ -31,8 +38,8 @@ jobs:
           - os: windows-2022
             cc: msvc
             cxx: msvc
-      fail-fast: false
-    name: ${{ matrix.os }} - ${{ matrix.cc }}
+
+    name: ${{ matrix.os }} (SM ${{ matrix.sm-branch }})
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -53,8 +60,8 @@ jobs:
           cc: ${{ matrix.cc }}
           cxx: ${{ matrix.cxx }}
           ambuild-ref: 'master'
-          mm-ref: '1.12-dev'
-          sm-ref: 'master'
+          mm-ref: ${{ inputs.mm-branch }}
+          sm-ref: ${{ matrix.sm-branch }}
           hl2sdk-manifests-ref: 'master'
           sdks: ${{ inputs.sdks }}
           configure-path: '../sm-ext-common/configure.py'
@@ -63,7 +70,7 @@ jobs:
       - name: Upload package
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.os }}
+          name: ${{ matrix.os }}-sm-${{ matrix.sm-branch }}
           path: ${{ steps.ambuild.outputs.package-path }}
           if-no-files-found: error
           retention-days: 14
@@ -80,9 +87,9 @@ jobs:
           path: ./gh-artifacts
 
       - name: Package artifacts
+        shell: bash
         working-directory: gh-artifacts
         run: |
-          version=`echo $GITHUB_REF | sed "s/refs\/tags\///"`
           for platform in *; do
             if [ -d "./$platform/" ]; then
               cd "./$platform/"
